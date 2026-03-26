@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    <title>Titkos Labda Projekt v1.5 - Secure</title>
+    <title>Titkos Labda Projekt v1.6 - Secure Generator</title>
     <link rel="manifest" href="manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -54,15 +54,15 @@
         
         #device-id-display {
             font-family: monospace; font-size: 0.8rem; color: #95a5a6;
-            background: #1a252f; padding: 5px; border-radius: 5px;
-            margin-bottom: 20px; display: block;
+            background: #1a252f; padding: 8px; border-radius: 5px;
+            margin-bottom: 20px; display: block; border: 1px dashed #34495e;
         }
 
         input[type="text"] {
             width: 100%; padding: 12px; border-radius: 10px; border: none;
             background: #ecf0f1; color: #2c3e50; font-weight: bold;
             font-size: 1.1rem; text-align: center; box-sizing: border-box;
-            margin-bottom: 15px;
+            margin-bottom: 15px; text-transform: uppercase;
         }
 
         #unlock-btn {
@@ -72,7 +72,7 @@
         }
         #unlock-btn:active { transform: scale(0.98); }
 
-        /* Telepítő Panel (Marad a v1.4-ből) */
+        /* Telepítő Panel */
         #install-panel {
             position: fixed; right: 0; top: 50%;
             transform: translateY(-50%) translateX(100%);
@@ -89,18 +89,18 @@
 
     <div id="activation-shield">
         <div id="activation-box">
-            <h2>🔒 AKTIVÁLÁS</h2>
-            <p style="color: #ecf0f1; font-size: 0.9rem;">A játék használatához add meg a kódot!</p>
+            <h2>🔒 RENDSZERZÁR</h2>
+            <p style="color: #ecf0f1; font-size: 0.9rem;">Add meg a termékkódot az aktiváláshoz!</p>
             <span id="device-id-display">ID: Generálás...</span>
-            <input type="text" id="activation-input" placeholder="Kód ide..." maxlength="20">
-            <button id="unlock-btn" onclick="checkCode()">Feloldás</button>
-            <p id="error-msg" style="color: #e74c3c; font-size: 0.8rem; margin-top: 10px; display: none;">Hibás kód! Próbáld újra.</p>
+            <input type="text" id="activation-input" placeholder="LABDA-XXXXXX" maxlength="20">
+            <button id="unlock-btn" onclick="checkCode()">Aktiválás</button>
+            <p id="error-msg" style="color: #e74c3c; font-size: 0.8rem; margin-top: 10px; display: none;">Érvénytelen kód! Ellenőrizd az ID-t.</p>
         </div>
     </div>
 
     <div id="ui-overlay">
-        <div style="font-weight: bold; color: #e74c3c;">🔒 PROJEKT v1.5</div>
-        <div id="status-text" style="font-size: 0.7rem; color: #95a5a6;">Rendszer: Aktív</div>
+        <div style="font-weight: bold; color: #e74c3c;">🔒 PROJEKT v1.6</div>
+        <div id="status-text" style="font-size: 0.7rem; color: #95a5a6;">Status: Verifying...</div>
     </div>
 
     <button id="fs-button" onclick="toggleFullScreen()">TELJES KÉPERNYŐ</button>
@@ -108,54 +108,62 @@
     <div id="install-panel">
         <button id="toggle-btn" onclick="togglePanel()">‹</button>
         <div id="install-content">
-            <span style="font-size: 0.7rem; font-weight: bold;">TELEPÍTÉS</span><br>
-            <button onclick="pwaInstall()" style="margin-top:5px; font-size:0.7rem;">OK</button>
+            <span style="font-size: 0.7rem; font-weight: bold;">PWA APP</span><br>
+            <button onclick="pwaInstall()" style="margin-top:5px; font-size:0.7rem;">TELEPÍTÉS</button>
         </div>
     </div>
 
     <canvas id="simCanvas"></canvas>
 
     <script>
-        // --- 1. AZONOSÍTÓ ÉS AKTIVÁLÁS LOGIKA ---
-        const TEST_KEY = "PROBA2026"; // Ez a "titkos" kód
+        // --- 1. KRIPTO AKTIVÁLÁS ---
+        // "Rejtett" Salt: TITKOS_RECEPT_2026_VADASZ
+        const _0x_S = "TITKOS_RECEPT_2026_VADASZ"; 
+
         let deviceID = localStorage.getItem('labda_device_id');
         let isActivated = localStorage.getItem('labda_activated') === 'true';
 
-        // Ha nincs ID, generálunk egyet
         if (!deviceID) {
-            deviceID = 'ID-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+            deviceID = 'ID-' + Math.random().toString(36).substr(2, 7).toUpperCase();
             localStorage.setItem('labda_device_id', deviceID);
         }
-        document.getElementById('device-id-display').innerText = "ID: " + deviceID;
+        document.getElementById('device-id-display').innerText = "AZONOSÍTÓ: " + deviceID;
 
-        // Ellenőrizzük, kell-e mutatni a pajzsot
         if (isActivated) {
             document.getElementById('activation-shield').style.display = 'none';
+        }
+
+        // Belső ellenőrző függvény (Ugyanaz, mint a Pythonban)
+        function _0x_verify(did, inputCode) {
+            let hash = 0;
+            let combined = did + _0x_S;
+            for (let i = 0; i < combined.length; i++) {
+                hash = ((hash << 5) - hash) + combined.charCodeAt(i);
+                hash |= 0; // 32-bit kényszerítés
+            }
+            let valid = "LABDA-" + Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
+            return inputCode.toUpperCase() === valid;
         }
 
         function checkCode() {
             const input = document.getElementById('activation-input').value.trim();
             const errorMsg = document.getElementById('error-msg');
             
-            if (input === TEST_KEY) {
+            if (_0x_verify(deviceID, input)) {
                 localStorage.setItem('labda_activated', 'true');
                 document.getElementById('activation-shield').style.display = 'none';
-                console.log("Sikeres aktiválás!");
             } else {
                 errorMsg.style.display = 'block';
-                setTimeout(() => { errorMsg.style.display = 'none'; }, 2000);
+                setTimeout(() => { errorMsg.style.display = 'none'; }, 3000);
             }
         }
 
-        // --- 2. PWA ÉS UI LOGIKA ---
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
-        }
+        // --- 2. PWA ÉS UI (Változatlan) ---
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
 
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
+            e.preventDefault(); deferredPrompt = e;
             document.getElementById('install-panel').classList.add('visible');
         });
 
@@ -178,21 +186,16 @@
             else document.exitFullscreen();
         }
 
-        // --- 3. FIZIKAI MOTOR (Változatlan v1.4 alap) ---
+        // --- 3. FIZIKAI MOTOR ---
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
         const config = { gravity: 0.65, friction: 0.982, bounce: 0.78, kickForce: 32, ballRadius: 40 };
         let ball = { x: 100, y: 100, vx: 10, vy: 0, radius: config.ballRadius, color: '#e74c3c', isGlowing: false };
 
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize); resize();
 
         function update() {
-            // Csak akkor számolunk fizikát, ha aktív az oldal (és nem takarja a pajzs)
             if (localStorage.getItem('labda_activated') === 'true') {
                 ball.vy += config.gravity;
                 ball.vx *= config.friction; ball.vy *= config.friction;
@@ -203,19 +206,15 @@
                 if (ball.x + ball.radius > canvas.width) { ball.x = canvas.width - ball.radius; ball.vx *= -config.bounce; }
                 if (ball.x - ball.radius < 0) { ball.x = ball.radius; ball.vx *= -config.bounce; }
             }
-
             draw();
             requestAnimationFrame(update);
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.beginPath();
-            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
             ctx.fillStyle = ball.isGlowing ? '#f1c40f' : '#e74c3c';
-            ctx.fill();
-            ctx.lineWidth = 3; ctx.strokeStyle = '#ecf0f1'; ctx.stroke();
-            ctx.closePath();
+            ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#ecf0f1'; ctx.stroke(); ctx.closePath();
         }
 
         function handleInput(clientX, clientY) {
@@ -230,10 +229,7 @@
         }
 
         canvas.addEventListener('mousedown', (e) => handleInput(e.clientX, e.clientY));
-        canvas.addEventListener('touchstart', (e) => {
-            handleInput(e.touches[0].clientX, e.touches[0].clientY);
-            e.preventDefault();
-        }, { passive: false });
+        canvas.addEventListener('touchstart', (e) => { handleInput(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); }, { passive: false });
 
         update();
     </script>
