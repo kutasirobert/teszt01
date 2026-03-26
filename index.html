@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    <title>Titkos Labda Projekt v1.6 - Secure Generator</title>
+    <title>Titkos Labda Projekt v1.6.1 - Fix</title>
     <link rel="manifest" href="manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -72,6 +72,13 @@
         }
         #unlock-btn:active { transform: scale(0.98); }
 
+        /* --- Teszt gomb a törléshez --- */
+        #reset-btn {
+            position: fixed; bottom: 10px; left: 10px;
+            background: none; border: none; color: #34495e;
+            font-size: 0.6rem; cursor: pointer; z-index: 100;
+        }
+
         /* Telepítő Panel */
         #install-panel {
             position: fixed; right: 0; top: 50%;
@@ -99,11 +106,12 @@
     </div>
 
     <div id="ui-overlay">
-        <div style="font-weight: bold; color: #e74c3c;">🔒 PROJEKT v1.6</div>
-        <div id="status-text" style="font-size: 0.7rem; color: #95a5a6;">Status: Verifying...</div>
+        <div style="font-weight: bold; color: #e74c3c;">🔒 PROJEKT v1.6.1</div>
+        <div id="status-text" style="font-size: 0.7rem; color: #95a5a6;">Status: Initializing...</div>
     </div>
 
     <button id="fs-button" onclick="toggleFullScreen()">TELJES KÉPERNYŐ</button>
+    <button id="reset-btn" onclick="resetLock()">[ TÖRÖL ]</button>
 
     <div id="install-panel">
         <button id="toggle-btn" onclick="togglePanel()">‹</button>
@@ -117,29 +125,35 @@
 
     <script>
         // --- 1. KRIPTO AKTIVÁLÁS ---
-        // "Rejtett" Salt: TITKOS_RECEPT_2026_VADASZ
         const _0x_S = "TITKOS_RECEPT_2026_VADASZ"; 
+        const statusText = document.getElementById('status-text');
 
         let deviceID = localStorage.getItem('labda_device_id');
         let isActivated = localStorage.getItem('labda_activated') === 'true';
 
+        // ID Generálás
         if (!deviceID) {
             deviceID = 'ID-' + Math.random().toString(36).substr(2, 7).toUpperCase();
             localStorage.setItem('labda_device_id', deviceID);
         }
         document.getElementById('device-id-display').innerText = "AZONOSÍTÓ: " + deviceID;
 
+        // Kezdő állapot beállítása
         if (isActivated) {
             document.getElementById('activation-shield').style.display = 'none';
+            statusText.innerText = "Status: Active";
+            statusText.style.color = "#2ecc71";
+        } else {
+            statusText.innerText = "Status: Locked";
+            statusText.style.color = "#e74c3c";
         }
 
-        // Belső ellenőrző függvény (Ugyanaz, mint a Pythonban)
         function _0x_verify(did, inputCode) {
             let hash = 0;
             let combined = did + _0x_S;
             for (let i = 0; i < combined.length; i++) {
                 hash = ((hash << 5) - hash) + combined.charCodeAt(i);
-                hash |= 0; // 32-bit kényszerítés
+                hash |= 0;
             }
             let valid = "LABDA-" + Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
             return inputCode.toUpperCase() === valid;
@@ -152,21 +166,27 @@
             if (_0x_verify(deviceID, input)) {
                 localStorage.setItem('labda_activated', 'true');
                 document.getElementById('activation-shield').style.display = 'none';
+                statusText.innerText = "Status: Active";
+                statusText.style.color = "#2ecc71";
             } else {
                 errorMsg.style.display = 'block';
                 setTimeout(() => { errorMsg.style.display = 'none'; }, 3000);
             }
         }
 
-        // --- 2. PWA ÉS UI (Változatlan) ---
-        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
+        // Tesztelési célú visszaállítás
+        function resetLock() {
+            localStorage.removeItem('labda_activated');
+            location.reload();
+        }
 
+        // --- 2. PWA ÉS UI ---
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js'); }
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault(); deferredPrompt = e;
             document.getElementById('install-panel').classList.add('visible');
         });
-
         async function pwaInstall() {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
@@ -175,12 +195,10 @@
                 deferredPrompt = null;
             }
         }
-
         function togglePanel() {
             document.getElementById('install-panel').classList.toggle('collapsed');
             document.getElementById('toggle-btn').innerText = document.getElementById('install-panel').classList.contains('collapsed') ? '›' : '‹';
         }
-
         function toggleFullScreen() {
             if (!document.fullscreenElement) document.documentElement.requestFullscreen();
             else document.exitFullscreen();
@@ -190,12 +208,13 @@
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
         const config = { gravity: 0.65, friction: 0.982, bounce: 0.78, kickForce: 32, ballRadius: 40 };
-        let ball = { x: 100, y: 100, vx: 10, vy: 0, radius: config.ballRadius, color: '#e74c3c', isGlowing: false };
+        let ball = { x: 200, y: 200, vx: 10, vy: 0, radius: config.ballRadius, color: '#e74c3c', isGlowing: false };
 
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.addEventListener('resize', resize); resize();
 
         function update() {
+            // Fizika csak ha aktív
             if (localStorage.getItem('labda_activated') === 'true') {
                 ball.vy += config.gravity;
                 ball.vx *= config.friction; ball.vy *= config.friction;
