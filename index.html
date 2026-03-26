@@ -4,232 +4,186 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    <title>Titkos Fizikai Szimuláció v1.4</title>
+    <title>Titkos Labda Projekt v1.4</title>
     <link rel="manifest" href="manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="LabdaApp">
 
     <style>
         body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #2c3e50;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #2c3e50;
+            font-family: 'Segoe UI', sans-serif;
         }
 
-        canvas {
-            display: block;
-            background-color: #34495e;
-            cursor: crosshair;
-        }
+        canvas { display: block; background-color: #34495e; cursor: crosshair; }
 
-        /* UI elemek */
+        /* --- UI Overlay --- */
         #ui-overlay {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            pointer-events: none;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 15px;
-            border-radius: 10px;
-            border-left: 5px solid #e74c3c;
-            color: #ecf0f1;
-            user-select: none;
-            z-index: 10;
+            position: absolute; top: 20px; left: 20px;
+            pointer-events: none; background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px; border-radius: 10px; border-left: 5px solid #e74c3c;
+            color: #ecf0f1; z-index: 10;
         }
 
-        .title {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #e74c3c;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+        /* --- Elrejthető Telepítő Panel --- */
+        #install-panel {
+            position: fixed; right: 0; top: 50%;
+            transform: translateY(-50%) translateX(100%); /* Alapból rejtve jobbra */
+            display: none; /* Csak ha telepíthető, akkor mutatjuk */
+            align-items: center;
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
         }
 
-        /* Teljes képernyő gomb */
+        #install-panel.visible { display: flex; transform: translateY(-50%) translateX(0); }
+        #install-panel.collapsed { transform: translateY(-50%) translateX(calc(100% - 40px)); }
+
+        #install-content {
+            background-color: #e74c3c; color: white;
+            padding: 15px; border-radius: 15px 0 0 15px;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.3);
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        #toggle-btn {
+            background-color: #c0392b; color: white;
+            border: none; width: 40px; height: 60px;
+            border-radius: 10px 0 0 10px; cursor: pointer;
+            font-weight: bold; font-size: 1.2rem;
+        }
+
+        #install-btn {
+            background-color: white; color: #e74c3c;
+            border: none; padding: 10px 20px; border-radius: 20px;
+            font-weight: bold; cursor: pointer; margin-top: 10px;
+            text-transform: uppercase; font-size: 0.8rem;
+        }
+
         #fs-button {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background-color: rgba(231, 76, 60, 0.6);
-            color: white;
-            border: 1px solid #e74c3c;
-            padding: 10px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            transition: all 0.3s;
-            z-index: 100;
-        }
-
-        #fs-button:hover {
-            background-color: rgba(231, 76, 60, 1);
-            transform: scale(1.1);
+            position: fixed; bottom: 20px; right: 20px;
+            background-color: rgba(0,0,0,0.5); color: white;
+            border: 1px solid #95a5a6; padding: 8px; border-radius: 5px;
+            cursor: pointer; z-index: 100; font-size: 0.7rem;
         }
     </style>
 </head>
 <body>
 
     <div id="ui-overlay">
-        <div class="title">🔒 Labda Projekt v1.4</div>
-        <div style="font-size: 0.8rem; color: #95a5a6; margin-top: 5px;">Mód: Fullscreen App Mode</div>
-        <div style="font-size: 0.7rem; margin-top: 10px;">Interakció: Érintés vagy kattintás a labdán</div>
+        <div style="font-weight: bold; color: #e74c3c;">🔒 PROJEKT v1.4</div>
+        <div style="font-size: 0.7rem; color: #95a5a6;">Mód: Intelligens PWA</div>
+    </div>
+
+    <div id="install-panel">
+        <button id="toggle-btn" onclick="togglePanel()">‹</button>
+        <div id="install-content">
+            <span style="font-size: 0.8rem; font-weight: bold;">APP TELEPÍTÉSE</span>
+            <button id="install-btn">MEHET!</button>
+        </div>
     </div>
 
     <button id="fs-button" onclick="toggleFullScreen()">TELJES KÉPERNYŐ</button>
-
     <canvas id="simCanvas"></canvas>
 
     <script>
+        // --- Service Worker Regisztráció ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('SW sikeresen regisztrálva'))
+                    .catch(err => console.log('SW hiba:', err));
+            });
+        }
+
+        // --- PWA Telepítési Logika ---
+        let deferredPrompt;
+        const installPanel = document.getElementById('install-panel');
+        const installBtn = document.getElementById('install-btn');
+        const toggleBtn = document.getElementById('toggle-btn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Megállítjuk az automatikus böngésző ablakot
+            e.preventDefault();
+            deferredPrompt = e;
+            // Megmutatjuk a saját panelünket
+            installPanel.classList.add('visible');
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    installPanel.classList.remove('visible');
+                }
+                deferredPrompt = null;
+            }
+        });
+
+        function togglePanel() {
+            installPanel.classList.toggle('collapsed');
+            toggleBtn.innerText = installPanel.classList.contains('collapsed') ? '›' : '‹';
+        }
+
+        // --- Fizika és Canvas (Változatlan v1.2 motor) ---
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d');
+        const config = { gravity: 0.65, friction: 0.982, bounce: 0.78, kickForce: 32, ballRadius: 40 };
+        let ball = { x: 100, y: 100, vx: 10, vy: 0, radius: config.ballRadius, color: '#e74c3c', isGlowing: false };
 
-        // --- Fizikai állandók ---
-        const config = {
-            gravity: 0.65,
-            friction: 0.982,
-            bounce: 0.78,
-            kickForce: 32,
-            ballRadius: 40
-        };
-
-        let ball = {
-            x: window.innerWidth / 2,
-            y: window.innerHeight / 2,
-            vx: 10,
-            vy: 0,
-            radius: config.ballRadius,
-            color: '#e74c3c',
-            isGlowing: false
-        };
-
-        // --- Ablakkezelés ---
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            
-            // Biztonsági fal-ellenőrzés
-            if (ball.x + ball.radius > canvas.width) ball.x = canvas.width - ball.radius;
-            if (ball.y + ball.radius > canvas.height) ball.y = canvas.height - ball.radius;
-            if (ball.x - ball.radius < 0) ball.x = ball.radius;
-            if (ball.y - ball.radius < 0) ball.y = ball.radius;
         }
-
         window.addEventListener('resize', resize);
         resize();
 
-        // --- Teljes képernyő funkció ---
         function toggleFullScreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    alert(`Hiba a váltáskor: ${err.message}`);
-                });
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
-            }
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
         }
 
-        // --- Fizikai számítások ---
         function update() {
             ball.vy += config.gravity;
-            ball.vx *= config.friction;
-            ball.vy *= config.friction;
+            ball.vx *= config.friction; ball.vy *= config.friction;
+            ball.x += ball.vx; ball.y += ball.vy;
 
-            ball.x += ball.vx;
-            ball.y += ball.vy;
-
-            // Alsó fal (Padló)
-            if (ball.y + ball.radius > canvas.height) {
-                ball.y = canvas.height - ball.radius;
-                ball.vy *= -config.bounce;
-                if (Math.abs(ball.vy) < 1.2) ball.vy = 0;
-            }
-            
-            // Felső fal (Plafon)
-            if (ball.y - ball.radius < 0) {
-                ball.y = ball.radius;
-                ball.vy *= -config.bounce;
-            }
-
-            // Jobb fal
-            if (ball.x + ball.radius > canvas.width) {
-                ball.x = canvas.width - ball.radius;
-                ball.vx *= -config.bounce;
-            }
-
-            // Bal fal
-            if (ball.x - ball.radius < 0) {
-                ball.x = ball.radius;
-                ball.vx *= -config.bounce;
-            }
+            if (ball.y + ball.radius > canvas.height) { ball.y = canvas.height - ball.radius; ball.vy *= -config.bounce; }
+            if (ball.y - ball.radius < 0) { ball.y = ball.radius; ball.vy *= -config.bounce; }
+            if (ball.x + ball.radius > canvas.width) { ball.x = canvas.width - ball.radius; ball.vx *= -config.bounce; }
+            if (ball.x - ball.radius < 0) { ball.x = ball.radius; ball.vx *= -config.bounce; }
 
             draw();
             requestAnimationFrame(update);
         }
 
-        // --- Megjelenítés ---
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Dinamikus árnyék
-            const shadowSize = Math.max(10, ball.radius * (ball.y / canvas.height));
-            const shadowOpacity = Math.max(0.1, 0.4 * (ball.y / canvas.height));
-            
-            ctx.beginPath();
-            ctx.ellipse(ball.x, canvas.height - 5, shadowSize, 6, 0, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(0,0,0,${shadowOpacity})`;
-            ctx.fill();
-            ctx.closePath();
-
-            // Labda teste
             ctx.beginPath();
             ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-            
-            // Gradiens a térhatáshoz
-            let gradient = ctx.createRadialGradient(
-                ball.x - ball.radius/3, ball.y - ball.radius/3, ball.radius/10,
-                ball.x, ball.y, ball.radius
-            );
-            gradient.addColorStop(0, ball.isGlowing ? '#f1c40f' : '#ff5e5e');
-            gradient.addColorStop(1, ball.isGlowing ? '#d4ac0d' : '#c0392b');
-            
-            ctx.fillStyle = gradient;
+            ctx.fillStyle = ball.isGlowing ? '#f1c40f' : '#e74c3c';
             ctx.fill();
-            
-            // Keret
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = ball.isGlowing ? '#ffffff' : '#ecf0f1';
-            ctx.stroke();
+            ctx.lineWidth = 3; ctx.strokeStyle = '#ecf0f1'; ctx.stroke();
             ctx.closePath();
         }
 
-        // --- Interakció (Egér és Érintés) ---
         function handleInput(clientX, clientY) {
-            const dx = clientX - ball.x;
-            const dy = clientY - ball.y;
+            const dx = clientX - ball.x; const dy = clientY - ball.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
-
             if (dist < ball.radius) {
                 const angle = Math.atan2(dy, dx);
                 ball.vx = -Math.cos(angle) * config.kickForce;
                 ball.vy = -Math.sin(angle) * config.kickForce;
-                
-                ball.isGlowing = true;
-                setTimeout(() => ball.isGlowing = false, 150);
+                ball.isGlowing = true; setTimeout(() => ball.isGlowing = false, 150);
             }
         }
 
         canvas.addEventListener('mousedown', (e) => handleInput(e.clientX, e.clientY));
         canvas.addEventListener('touchstart', (e) => {
             handleInput(e.touches[0].clientX, e.touches[0].clientY);
-            e.preventDefault(); // Ne görgessen az oldal
+            e.preventDefault();
         }, { passive: false });
 
         update();
